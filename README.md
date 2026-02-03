@@ -10,6 +10,14 @@ This repository contains a **contextual LoRA** trained for **black-forest-labs/F
 - **Examples**: `Example/` (input images + generated atlases)
 - **Post-processing scripts**: `flux_pipeline.py`, `flux_grid_to_ttf.py`, `flux_upscale.py`
 
+## Examples
+
+<img width="2048" height="1024" alt="Example1_C" src="https://github.com/user-attachments/assets/c09b7f5e-93e9-4889-a8af-9eb9c69013ca" />
+
+<img width="2048" height="1024" alt="Example2_C" src="https://github.com/user-attachments/assets/f1a711c5-119f-4b0c-9d09-4a5f4aefa0b2" />
+
+<img width="2048" height="1024" alt="Example3_C" src="https://github.com/user-attachments/assets/db9eb2b8-7c7c-4afa-b3b1-69c0ae9bf53e" />
+
 ## License
 MIT
 
