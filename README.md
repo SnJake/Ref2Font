@@ -91,9 +91,9 @@ After you generate the atlas, use the pipeline script to convert the atlas into 
 
 ### Example command (Windows)
 ```powershell
-python "Flux 2 Klein 9B\flux_pipeline.py" ^
+python flux_pipeline.py ^
   --input "D:\ComfyUI_temp_nckhb_00003_.png" ^
-  --output-dir "G:\Programs\FontNN\Flux 2 Klein 9B\test" ^
+  --output-dir "G:\Flux 2 Klein 9B\test" ^
   --no-upscale ^
   --use-grid ^
   --vectorize contours ^
@@ -113,7 +113,7 @@ python "Flux 2 Klein 9B\flux_pipeline.py" ^
 
 ### Generic command template
 ```powershell
-python "Flux 2 Klein 9B\flux_pipeline.py" ^
+python flux_pipeline.py ^
   --input "path/to/atlas_name.png" ^
   --output-dir "output/dir" ^
   --no-upscale ^
