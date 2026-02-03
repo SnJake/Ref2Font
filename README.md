@@ -17,7 +17,6 @@ MIT
 The post-processing scripts require Python 3.10+ and these packages:
 
 ```
-# Flux 2 Klein 9B/requirements.txt
 numpy
 pillow
 fonttools
@@ -38,7 +37,7 @@ pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu12
 ```powershell
 git clone https://github.com/SnJake/Ref2Font.git
 cd Ref2Font
-# from the repo root or the "Flux 2 Klein 9B" folder
+# from the repo root
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
