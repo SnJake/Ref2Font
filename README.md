@@ -18,9 +18,6 @@ This repository contains a **contextual LoRA** trained for **black-forest-labs/F
 
 <img width="2048" height="1024" alt="Example3_C" src="https://github.com/user-attachments/assets/db9eb2b8-7c7c-4afa-b3b1-69c0ae9bf53e" />
 
-## License
-MIT
-
 ## Requirements
 The post-processing scripts require Python 3.10+ and these packages:
 
@@ -148,3 +145,6 @@ python "Flux 2 Klein 9B\flux_pipeline.py" ^
 - `flux_upscale.py` is optional. You can skip upscaling with `--no-upscale`.
 - If you see odd inversion, try removing `--no-auto-invert` or add `--invert`.
 - If you see vertical jitter, use `--baseline-mode auto` (enabled in the example above).
+
+## License
+MIT
