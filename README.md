@@ -77,7 +77,7 @@ Download the LoRA:
 
 [HF Repo](https://huggingface.co/SnJake/Ref2Font)
 
-Or from [CivitAI](Placeholder).
+Or from [CivitAI](https://civitai.com/models/2361340).
 
 Place in: `ComfyUI/models/loras`
 
