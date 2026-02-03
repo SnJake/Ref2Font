@@ -107,11 +107,6 @@ def contours_from_image(
 
     arr = np.array(work, dtype=np.float32) / 255.0
     
-    # Инверсия (белые буквы на черном или наоборот). 
-    # Предполагаем, что буквы светлее фона, если среднее < 0.5, иначе инвертируем.
-    # Но для надежности лучше считать, что threshold отделяет объект.
-    # Обычно find_contours ищет уровень. Если буквы белые (1.0), level 0.5 работает.
-    # Если буквы черные (0.0), нужно инвертировать.
     if invert:
         arr = 1.0 - arr
 
@@ -126,15 +121,15 @@ def contours_from_image(
         # skimage возвращает (row, col) -> (y, x). Нам нужно (x, y)
         pts = np.stack([contour[:, 1], contour[:, 0]], axis=1)
         
-        # 1. Сначала упрощаем, чтобы убрать шум пикселей
+
         if simplify > 0:
             pts = measure.approximate_polygon(pts, tolerance=simplify)
         
-        # 2. Сглаживаем углы (Chaikin), пока координаты еще крупные
+
         if smooth_iters > 0 and pts.shape[0] > 3:
             pts = chaikin_smooth(pts, iterations=smooth_iters)
 
-        # 3. Возвращаем к оригинальному масштабу
+
         if trace_scale > 1:
             pts = pts / float(trace_scale)
             
@@ -162,19 +157,12 @@ def draw_glyph_fixed_grid(
     pixel_baseline: float,
     cell_width_ref: int
 ) -> int:
-    """
-    Рисует глиф, полагаясь на координаты внутри ячейки, а не на bbox глифа.
-    Это предотвращает "пляску" букв.
-    """
+
     
-    # Y-координата базовой линии в пикселях картинки (сверху вниз)
-    # pixel_baseline is in cell-local pixel coords (Y down from top).
 
     if not contours:
         return int(cell_width_ref * scale * 0.5)
 
-    # Вычисляем ширину глифа для Advance Width (отступ справа)
-    # Но рисуем все равно относительно 0,0 ячейки
     g_min_x = float("inf")
     g_max_x = float("-inf")
     for contour in contours:
@@ -197,13 +185,8 @@ def draw_glyph_fixed_grid(
             pen.lineTo((px, py))
         pen.closePath()
     
-    # Advance width: ширина контента + боковые отступы
-    # Либо фиксированная ширина ячейки, если шрифт моноширинный
     content_width = max(0, g_max_x - g_min_x)
     
-    # Если хотим "плотный" шрифт, берем ширину контента.
-    # Если хотим, как в атласе (моноширинно), берем cell_width_ref.
-    # Обычно для Flux атласов лучше брать контент + bearing, иначе пробелы огромные.
     return int(content_width * scale + 2 * side_bearing)
 
 
@@ -289,10 +272,6 @@ def main() -> None:
         if row_baselines:
             baseline_ratio_used = float(np.median(list(row_baselines.values()))) / float(cell_h)
 
-    # 2. Вычисляем Scale
-    # Мы хотим, чтобы cell_h соответствовал UPM (с учетом паддингов)
-    # Тогда baseline, заданный как ratio от cell_h, встанет правильно.
-    # Scale = UPM / Cell_Height_Pixels
     scale = args.upm / float(cell_h) * (1.0 - args.padding) 
 
     ascent = int(args.upm * baseline_ratio_used)
@@ -363,3 +342,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
