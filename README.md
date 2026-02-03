@@ -1,4 +1,4 @@
-﻿# Ref2FontV1 (FLUX.2 Klein 9B) — Contextual LoRA for Font Atlases
+﻿# Ref2Font (FLUX.2 Klein 9B LoRA) — Contextual LoRA for Font Atlases
 
 This repository contains a **contextual LoRA** trained for **black-forest-labs/FLUX.2-klein-9B**. It generates **1024×1024 font atlases** from a single reference image (in the same style/format as the provided examples).
 
