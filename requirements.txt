@@ -1,0 +1,5 @@
+﻿numpy
+pillow
+fonttools
+scikit-image
+tqdm
