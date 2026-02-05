@@ -137,7 +137,7 @@ python flux_pipeline.py ^
 1) Download base models (see links above) and place them in ComfyUI folders.
 2) Download LoRA and put it in `ComfyUI/models/loras`.
 3) Create the input image (1024×1024, pure black/white, like the examples). You can create input image in Nano Banana Pro or other similar models.
-4) Run the ComfyUI workflow (`Example Workflow/`) and generate the atlas. Important: To get the correct grid layout and character sequence, you must use this prompt:
+4) Run the ComfyUI workflow (`Example Workflow/`) and generate the atlas. **Important: To get the correct grid layout and character sequence, you must use this prompt:**
 Generate letters and symbols "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-" in the style of the letters given to you as a reference.
 5) Create and activate a venv, then install dependencies.
 6) Run `flux_pipeline.py` with your atlas path to generate the TTF.
