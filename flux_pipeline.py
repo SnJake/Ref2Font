@@ -19,6 +19,19 @@ def sanitize_name(value: str) -> str:
     return value or "font"
 
 
+def resolve_stem_case(path: Path) -> str:
+    stem = path.stem
+    try:
+        parent = path.parent
+        name_lower = path.name.lower()
+        for candidate in parent.iterdir():
+            if candidate.name.lower() == name_lower:
+                return candidate.stem
+    except OSError:
+        pass
+    return stem
+
+
 def iter_images(input_path: Path) -> list[Path]:
     if input_path.is_file():
         return [input_path]
@@ -80,6 +93,7 @@ def build_atlas_cmd(
             cmd.extend(["--component-center-bias", str(args.component_center_bias)])
         cmd.extend(["--cell-bleed", str(args.cell_bleed)])
         cmd.extend(["--cell-bleed-max", str(args.cell_bleed_max)])
+        cmd.extend(["--core-overlap-min", str(args.core_overlap_min)])
         if args.glyph_post_scale is not None:
             cmd.extend(["--glyph-post-scale", str(args.glyph_post_scale)])
         if args.invert:
@@ -174,6 +188,12 @@ def main() -> None:
         default=24,
         help="Maximum bleed in pixels around each grid cell.",
     )
+    parser.add_argument(
+        "--core-overlap-min",
+        type=float,
+        default=0.25,
+        help="Minimum component overlap ratio with the core cell box (grid cleanup).",
+    )
 
     parser.add_argument("--vectorize", choices=["rects", "contours"], default="contours")
     parser.add_argument("--simplify", type=float, default=0.8)
@@ -219,6 +239,8 @@ def main() -> None:
         raise SystemExit("--cell-bleed must be >= 0.")
     if args.cell_bleed_max < 0:
         raise SystemExit("--cell-bleed-max must be >= 0.")
+    if args.core_overlap_min < 0 or args.core_overlap_min > 1:
+        raise SystemExit("--core-overlap-min must be in [0, 1].")
 
     input_path = Path(args.input)
     output_dir = Path(args.output_dir)
@@ -292,7 +314,7 @@ def main() -> None:
             upscaled_images.append(out_path)
 
     for image_path in tqdm(upscaled_images, desc="Converting to TTF"):
-        font_name = sanitize_name(image_path.stem)
+        font_name = sanitize_name(resolve_stem_case(image_path))
         font_debug = debug_dir / font_name if debug_dir else None
         script = grid_script if args.use_grid else atlas_script
         
