@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import sys
 from pathlib import Path
@@ -12,13 +13,58 @@ import torch.nn.functional as F
 from PIL import Image
 from tqdm import tqdm
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
-sys.path.append(str(ROOT_DIR / "src"))
-
-from fontnn.models.atlas_upscaler import AtlasSuperResolutionNet, UpscalerConfig
+Upscaler = Any
 
 
-Upscaler = AtlasSuperResolutionNet
+def _fontnn_search_paths() -> list[Path]:
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here / "src",
+        here.parent / "src",
+        here.parent / "FontNN" / "src",
+    ]
+    for env_name in ("FONTNN_HOME", "FONTNN_PATH", "FONTNN_DIR"):
+        raw = os.environ.get(env_name)
+        if not raw:
+            continue
+        env_path = Path(raw).expanduser()
+        candidates.append(env_path)
+        candidates.append(env_path / "src")
+    uniq: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(path)
+    return uniq
+
+
+def _import_upscaler_classes() -> tuple[type, type]:
+    try:
+        from fontnn.models.atlas_upscaler import AtlasSuperResolutionNet, UpscalerConfig
+
+        return AtlasSuperResolutionNet, UpscalerConfig
+    except ModuleNotFoundError as exc:
+        if exc.name != "fontnn":
+            raise
+
+    for candidate in _fontnn_search_paths():
+        if candidate.exists():
+            candidate_str = str(candidate)
+            if candidate_str not in sys.path:
+                sys.path.insert(0, candidate_str)
+
+    try:
+        from fontnn.models.atlas_upscaler import AtlasSuperResolutionNet, UpscalerConfig
+    except ModuleNotFoundError as exc:
+        searched = [str(p) for p in _fontnn_search_paths()]
+        raise ModuleNotFoundError(
+            "No module named 'fontnn'. Set FONTNN_HOME/FONTNN_PATH to your FontNN repo path "
+            f"(expected to contain or provide access to 'src/fontnn'). Checked: {searched}"
+        ) from exc
+    return AtlasSuperResolutionNet, UpscalerConfig
 
 
 def _extract_state_dict(checkpoint: dict[str, Any]) -> dict[str, torch.Tensor]:
@@ -48,6 +94,7 @@ def _extract_model_config(checkpoint: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_checkpoint(checkpoint_path: Path) -> tuple[Upscaler, dict[str, Any]]:
+    AtlasSuperResolutionNet, UpscalerConfig = _import_upscaler_classes()
     pathlib.PosixPath = pathlib.WindowsPath
     try:
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
