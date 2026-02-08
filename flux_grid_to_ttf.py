@@ -235,6 +235,7 @@ def clean_cell_components(
     keep_components: int,
     min_component_area: int,
     center_bias: float,
+    core_overlap_min: float,
     core_box: tuple[int, int, int, int] | None = None,
 ) -> Image.Image:
     arr = np.array(cell_img.convert("L"), dtype=np.uint8)
@@ -271,15 +272,18 @@ def clean_cell_components(
         fallback.append((area, int(region.label)))
         if area < int(min_component_area):
             continue
-        minr, minc, maxr, maxc = region.bbox
-        intersects_core = (maxc > core_x0) and (minc < core_x1) and (maxr > core_y0) and (minr < core_y1)
+        label_id = int(region.label)
+        region_mask = labels == label_id
+        core_overlap = int(region_mask[core_y0:core_y1, core_x0:core_x1].sum())
+        overlap_ratio = float(core_overlap) / float(area) if area > 0 else 0.0
+        intersects_core = overlap_ratio >= float(core_overlap_min)
         ry, rx = region.centroid
         dist_norm = float(math.hypot(float(rx) - cx, float(ry) - cy) / diag)
         score = float(area) * (1.0 - float(center_bias) * dist_norm)
         if intersects_core:
-            candidates_core.append((score, int(region.label)))
+            candidates_core.append((score, label_id))
         else:
-            candidates_other.append((score, int(region.label)))
+            candidates_other.append((score, label_id))
 
     if candidates_core:
         candidates_core.sort(key=lambda x: x[0], reverse=True)
@@ -298,11 +302,40 @@ def clean_cell_components(
 
 
 def component_limit_for_char(ch: str, max_keep: int) -> int:
-    # Most glyphs are single connected component.
-    # Keep 2 for common multi-part punctuation/letters.
-    multi = {"i", "j", ":", ";", "!", "?"}
-    target = 2 if ch in multi else 1
-    return max(1, min(int(max_keep), target))
+    multi = {
+        "%",
+        "=",
+        '"',
+        "'",
+        "*",
+        "+",
+        "i",
+        "j",
+        ":",
+        ";",
+        "!",
+        "?",
+        "A",
+        "B",
+        "E",
+        "F",
+        "H",
+        "K",
+        "R",
+        "X",
+        "Z",
+        "a",
+        "b",
+        "e",
+        "f",
+        "h",
+        "k",
+        "r",
+        "x",
+        "z",
+    }
+    recommended_min = 2 if ch in multi else 1
+    return max(1, max(int(max_keep), recommended_min))
 
 
 def main() -> None:
@@ -377,6 +410,12 @@ def main() -> None:
         default=24,
         help="Maximum bleed in pixels around each cell.",
     )
+    parser.add_argument(
+        "--core-overlap-min",
+        type=float,
+        default=0.25,
+        help="Minimum fraction of component area that must lie inside the core cell box.",
+    )
 
     # Vectorization
     parser.add_argument("--threshold", type=int, default=127)
@@ -412,6 +451,8 @@ def main() -> None:
         raise SystemExit("cell-bleed must be >= 0")
     if args.cell_bleed_max < 0:
         raise SystemExit("cell-bleed-max must be >= 0")
+    if args.core_overlap_min < 0 or args.core_overlap_min > 1:
+        raise SystemExit("core-overlap-min must be in [0, 1]")
 
     image_path = Path(args.image)
     output_dir = Path(args.output_dir)
@@ -481,6 +522,7 @@ def main() -> None:
                 keep_components=component_limit_for_char(ch, args.keep_components),
                 min_component_area=args.min_component_area,
                 center_bias=args.component_center_bias,
+                core_overlap_min=args.core_overlap_min,
                 core_box=(x0 - ex0, y0 - ey0, x0 - ex0 + cell_w, y0 - ey0 + cell_h),
             )
             contour_invert = invert
@@ -545,6 +587,10 @@ def main() -> None:
         ascent = max(1, int(ascent * glyph_post_scale))
         descent = -max(1, int(abs(descent) * glyph_post_scale))
 
+    font_name = str(args.font_name).strip() or "FluxFont"
+    ps_name = "-".join(font_name.split())
+    out_file_stem = "_".join(font_name.split())
+
     fb = FontBuilder(args.upm, isTTF=True)
     glyph_order = [".notdef"] + list(args.charset)
     has_space = " " in args.charset
@@ -553,11 +599,11 @@ def main() -> None:
     fb.setupGlyphOrder(glyph_order)
     fb.setupNameTable(
         dict(
-            familyName=args.font_name,
+            familyName=font_name,
             styleName="Regular",
-            uniqueFontIdentifier=args.font_name,
-            fullName=args.font_name,
-            psName=args.font_name.replace(" ", "-"),
+            uniqueFontIdentifier=font_name,
+            fullName=font_name,
+            psName=ps_name,
             version="Version 1.0",
         )
     )
@@ -615,7 +661,7 @@ def main() -> None:
         usWinDescent=abs(descent),
     )
 
-    out_path = output_dir / f"{args.font_name.replace(' ', '_')}.ttf"
+    out_path = output_dir / f"{out_file_stem}.ttf"
     fb.save(out_path)
     print(f"Saved: {out_path}")
 
