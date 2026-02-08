@@ -321,6 +321,9 @@ def main() -> None:
 
     fb = FontBuilder(args.upm, isTTF=True)
     glyph_order = [".notdef"] + list(args.charset)
+    has_space = " " in args.charset
+    if not has_space:
+        glyph_order.append("space")
     fb.setupGlyphOrder(glyph_order)
     fb.setupNameTable(
         dict(
@@ -366,11 +369,20 @@ def main() -> None:
         advance = int(glyph.mask.shape[1] * scale + 2 * args.side_bearing)
         metrics[glyph.char] = (advance, args.side_bearing)
 
+    if not has_space:
+        space_pen = TTGlyphPen(None)
+        glyph_dict["space"] = space_pen.glyph()
+        space_advance = max(int(args.upm * 0.33), args.side_bearing * 2)
+        metrics["space"] = (space_advance, 0)
+
     fb.setupGlyf(glyph_dict)
-    fb.setupCharacterMap({ord(c): c for c in args.charset})
+    cmap = {ord(c): c for c in args.charset}
+    if not has_space:
+        cmap[ord(" ")] = "space"
+    fb.setupCharacterMap(cmap)
     fb.setupHorizontalMetrics(metrics)
     fb.setupHorizontalHeader(ascent=ascent, descent=descent)
-    fb.setupOS2(sTypoAscender=ascent, usWinAscent=ascent, usWinDescent=abs(descent))
+    fb.setupOS2(sTypoAscender=ascent, sTypoDescender=descent, usWinAscent=ascent, usWinDescent=abs(descent))
 
     out_path = output_dir / f"{args.font_name.replace(' ', '_')}.ttf"
     fb.save(out_path)

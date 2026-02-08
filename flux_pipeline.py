@@ -65,6 +65,17 @@ def build_atlas_cmd(
         cmd.extend(["--trace-scale", str(args.trace_scale)])
         cmd.extend(["--trace-blur", str(args.trace_blur)])
         cmd.extend(["--smooth-iters", str(args.smooth_iters)])
+        cmd.extend(["--descender-chars", str(args.descender_chars)])
+        cmd.extend(["--descender-lift", str(args.descender_lift)])
+        if not args.no_clean_components:
+            cmd.append("--clean-components")
+            cmd.extend(["--keep-components", str(args.keep_components)])
+            cmd.extend(["--min-component-area", str(args.min_component_area)])
+            cmd.extend(["--component-center-bias", str(args.component_center_bias)])
+        cmd.extend(["--cell-bleed", str(args.cell_bleed)])
+        cmd.extend(["--cell-bleed-max", str(args.cell_bleed_max)])
+        if args.glyph_post_scale is not None:
+            cmd.extend(["--glyph-post-scale", str(args.glyph_post_scale)])
         if args.invert:
             cmd.append("--invert")
         if args.no_auto_invert:
@@ -122,6 +133,41 @@ def main() -> None:
     parser.add_argument("--use-grid", action="store_true", help="Use grid-based atlas to TTF conversion.")
     parser.add_argument("--canvas", type=int, default=2048, help="Atlas canvas size for grid conversion.")
     parser.add_argument("--post-threshold", type=int, default=None)
+    parser.add_argument(
+        "--no-clean-components",
+        action="store_true",
+        help="Disable per-cell connected-component cleanup in grid conversion.",
+    )
+    parser.add_argument(
+        "--keep-components",
+        type=int,
+        default=3,
+        help="How many connected components to keep per cell (grid cleanup).",
+    )
+    parser.add_argument(
+        "--min-component-area",
+        type=int,
+        default=6,
+        help="Minimum connected-component area in pixels (grid cleanup).",
+    )
+    parser.add_argument(
+        "--component-center-bias",
+        type=float,
+        default=0.25,
+        help="Center preference for component ranking in [0,1] (grid cleanup).",
+    )
+    parser.add_argument(
+        "--cell-bleed",
+        type=float,
+        default=0.08,
+        help="Extra margin around each grid cell for contour extraction.",
+    )
+    parser.add_argument(
+        "--cell-bleed-max",
+        type=int,
+        default=24,
+        help="Maximum bleed in pixels around each grid cell.",
+    )
 
     parser.add_argument("--vectorize", choices=["rects", "contours"], default="contours")
     parser.add_argument("--simplify", type=float, default=0.8)
@@ -134,10 +180,39 @@ def main() -> None:
     parser.add_argument("--trace-scale", type=int, default=8)
     parser.add_argument("--trace-blur", type=float, default=1.0)
     parser.add_argument("--smooth-iters", type=int, default=2)
+    parser.add_argument(
+        "--descender-chars",
+        default="gjpqy",
+        help="Characters to lift up slightly in grid conversion.",
+    )
+    parser.add_argument(
+        "--descender-lift",
+        type=float,
+        default=0.02,
+        help="Lift amount for descender chars (fraction of cell height).",
+    )
+    parser.add_argument(
+        "--glyph-post-scale",
+        type=float,
+        default=None,
+        help="Optional final glyph scale multiplier before TTF save (e.g. 1.1).",
+    )
     parser.add_argument("--invert", action="store_true", help="Force inversion before tracing (grid).")
     parser.add_argument("--no-auto-invert", action="store_true", help="Disable auto inversion (grid).")
 
     args = parser.parse_args()
+    if args.glyph_post_scale is not None and args.glyph_post_scale <= 0:
+        raise SystemExit("glyph-post-scale must be > 0")
+    if args.keep_components < 1:
+        raise SystemExit("--keep-components must be >= 1.")
+    if args.min_component_area < 1:
+        raise SystemExit("--min-component-area must be >= 1.")
+    if args.component_center_bias < 0 or args.component_center_bias > 1:
+        raise SystemExit("--component-center-bias must be in [0, 1].")
+    if args.cell_bleed < 0:
+        raise SystemExit("--cell-bleed must be >= 0.")
+    if args.cell_bleed_max < 0:
+        raise SystemExit("--cell-bleed-max must be >= 0.")
 
     input_path = Path(args.input)
     output_dir = Path(args.output_dir)

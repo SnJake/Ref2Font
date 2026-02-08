@@ -9,7 +9,21 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 
-CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"
+LATIN_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"
+CYRILLIC_CHARSET = (
+    "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+    "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+    "0123456789!?.,;:-"
+)
+PRESET_CHARSETS: dict[str, str] = {
+    "latin": LATIN_CHARSET,
+    "cyrillic": CYRILLIC_CHARSET,
+}
+DEFAULT_CHARSETS = "latin,cyrillic"
+DEFAULT_BASELINE = 0.75
+DEFAULT_ATLAS_FILL_RATIO = 0.9
+DEFAULT_DESCENDER_CHARS = "gjpqy"
+DEFAULT_DESCENDER_LIFT = 0.02
 DEFAULT_INDEX = Path(r"G:\Programs\FontNN\data\raw\fonts_index.json")
 DEFAULT_PROCESSED_DIR = Path(r"G:\Programs\FontNN\data\processed")
 
@@ -156,22 +170,44 @@ def compute_grid(count: int, width: int, height: int) -> tuple[int, int, int, in
     return best_grid
 
 
-def max_bbox_for_charset(font: ImageFont.FreeTypeFont, charset: str) -> tuple[int, int] | None:
+def pick_control_pair(label: str, charset: str) -> tuple[str, str]:
+    if label == "cyrillic":
+        return "А", "а"
+    if "А" in charset and "а" in charset and ("A" not in charset or "a" not in charset):
+        return "А", "а"
+    return "A", "a"
+
+
+def glyph_baseline_metrics(
+    font: ImageFont.FreeTypeFont, ch: str
+) -> tuple[int, int, int, tuple[int, int, int, int]] | None:
+    bbox = font.getbbox(ch, anchor="ls")
+    if not bbox:
+        return None
+    w = bbox[2] - bbox[0]
+    if w <= 0:
+        return None
+    up = max(0, -bbox[1])
+    down = max(0, bbox[3])
+    return w, up, down, bbox
+
+
+def max_baseline_extents(font: ImageFont.FreeTypeFont, charset: str) -> tuple[int, int, int] | None:
     max_w = 0
-    max_h = 0
+    max_up = 0
+    max_down = 0
     for ch in charset:
-        bbox = font.getbbox(ch)
-        if not bbox:
+        metrics = glyph_baseline_metrics(font, ch)
+        if metrics is None:
             return None
-        w = bbox[2] - bbox[0]
-        h = bbox[3] - bbox[1]
-        if w <= 0 or h <= 0:
-            return None
+        w, up, down, _ = metrics
         if w > max_w:
             max_w = w
-        if h > max_h:
-            max_h = h
-    return max_w, max_h
+        if up > max_up:
+            max_up = up
+        if down > max_down:
+            max_down = down
+    return max_w, max_up, max_down
 
 
 def glyph_metrics(font: ImageFont.FreeTypeFont, ch: str) -> tuple[int, int, tuple[int, int, int, int]] | None:
@@ -200,10 +236,19 @@ def pair_metrics(
     return total_w, max_h, gap, left_bbox, right_bbox
 
 
-def choose_font(font_path: Path, charset: str, cell_size: int, fill_ratio: float = 0.85) -> ImageFont.FreeTypeFont | None:
+def choose_font(
+    font_path: Path,
+    charset: str,
+    cell_size: int,
+    baseline_ratio: float,
+    fill_ratio: float = DEFAULT_ATLAS_FILL_RATIO,
+) -> ImageFont.FreeTypeFont | None:
     min_size = 4
     max_size = max(min_size, int(cell_size * 0.95))
-    target = int(cell_size * fill_ratio)
+    baseline = cell_size * baseline_ratio
+    target_w = cell_size * fill_ratio
+    target_up = baseline * fill_ratio
+    target_down = (cell_size - baseline) * fill_ratio
     best_size = None
 
     lo, hi = min_size, max_size
@@ -213,11 +258,11 @@ def choose_font(font_path: Path, charset: str, cell_size: int, fill_ratio: float
             font = ImageFont.truetype(str(font_path), size=mid)
         except Exception:
             return None
-        metrics = max_bbox_for_charset(font, charset)
+        metrics = max_baseline_extents(font, charset)
         if metrics is None:
             return None
-        max_w, max_h = metrics
-        if max_w <= target and max_h <= target:
+        max_w, max_up, max_down = metrics
+        if max_w <= target_w and max_up <= target_up and max_down <= target_down:
             best_size = mid
             lo = mid + 1
         else:
@@ -269,17 +314,23 @@ def choose_font_for_pair(
         return None
 
 
-def draw_char(draw: ImageDraw.ImageDraw, font: ImageFont.FreeTypeFont, ch: str, cell_x: int, cell_y: int, cell_size: int) -> bool:
-    bbox = font.getbbox(ch)
-    if not bbox:
+def draw_char(
+    draw: ImageDraw.ImageDraw,
+    font: ImageFont.FreeTypeFont,
+    ch: str,
+    cell_x: int,
+    cell_y: int,
+    cell_size: int,
+    baseline_ratio: float,
+    y_shift_px: float = 0.0,
+) -> bool:
+    metrics = glyph_baseline_metrics(font, ch)
+    if metrics is None:
         return False
-    w = bbox[2] - bbox[0]
-    h = bbox[3] - bbox[1]
-    if w <= 0 or h <= 0:
-        return False
+    w, _, _, bbox = metrics
     x = cell_x + (cell_size - w) / 2 - bbox[0]
-    y = cell_y + (cell_size - h) / 2 - bbox[1]
-    draw.text((x, y), ch, font=font, fill=(255, 255, 255))
+    baseline_y = cell_y + (cell_size * baseline_ratio) - y_shift_px
+    draw.text((x, baseline_y), ch, font=font, fill=(255, 255, 255), anchor="ls")
     return True
 
 
@@ -318,6 +369,9 @@ def render_target(
     charset: str,
     canvas_size: int,
     grid: tuple[int, int, int, int, int],
+    baseline_ratio: float,
+    descender_chars: set[str] | None = None,
+    descender_lift: float = 0.0,
 ) -> Image.Image | None:
     cols, rows, cell_size, offset_x, offset_y = grid
     target = Image.new("RGB", (canvas_size, canvas_size), (0, 0, 0))
@@ -328,7 +382,17 @@ def render_target(
         col = idx % cols
         cell_x = offset_x + col * cell_size
         cell_y = offset_y + row * cell_size
-        if not draw_char(draw_target, font, ch, cell_x, cell_y, cell_size):
+        y_shift_px = cell_size * descender_lift if descender_chars and ch in descender_chars else 0.0
+        if not draw_char(
+            draw_target,
+            font,
+            ch,
+            cell_x,
+            cell_y,
+            cell_size,
+            baseline_ratio,
+            y_shift_px=y_shift_px,
+        ):
             return None
 
     return target
@@ -354,10 +418,16 @@ def process_font(task: dict) -> tuple[str, str | None]:
     charset: str = task["charset"]
     canvas: int = task["canvas"]
     grid: tuple[int, int, int, int, int] = task["grid"]
+    baseline_ratio: float = task["baseline_ratio"]
     targets_dir: Path = task["targets_dir"]
     controls_dir: Path = task["controls_dir"]
     prompt_text: str = task["prompt_text"]
     glyphs: set[str] | None = task.get("glyphs")
+    control_left: str = task.get("control_left", "A")
+    control_right: str = task.get("control_right", "a")
+    atlas_fill_ratio: float = task.get("atlas_fill_ratio", DEFAULT_ATLAS_FILL_RATIO)
+    descender_chars = set(task.get("descender_chars", DEFAULT_DESCENDER_CHARS) or "")
+    descender_lift: float = float(task.get("descender_lift", DEFAULT_DESCENDER_LIFT))
 
     target_path = targets_dir / f"{safe_name}.webp"
     control_path = controls_dir / f"{safe_name}.webp"
@@ -370,16 +440,30 @@ def process_font(task: dict) -> tuple[str, str | None]:
         else:
             if not supports_charset(font_path, charset):
                 return "skip", f"Skip (missing glyphs): {font_path}"
-        atlas_font = choose_font(font_path, charset, grid[2])
+        atlas_font = choose_font(
+            font_path,
+            charset,
+            grid[2],
+            baseline_ratio,
+            fill_ratio=atlas_fill_ratio,
+        )
         if atlas_font is None:
             return "skip", f"Skip (render error): {font_path}"
-        target = render_target(atlas_font, charset, canvas, grid)
+        target = render_target(
+            atlas_font,
+            charset,
+            canvas,
+            grid,
+            baseline_ratio,
+            descender_chars=descender_chars,
+            descender_lift=descender_lift,
+        )
         if target is None:
             return "skip", f"Skip (bbox error): {font_path}"
-        control_font = choose_font_for_pair(font_path, "A", "a", canvas)
+        control_font = choose_font_for_pair(font_path, control_left, control_right, canvas)
         if control_font is None:
             return "skip", f"Skip (control render error): {font_path}"
-        control = render_control(control_font, canvas)
+        control = render_control(control_font, canvas, left=control_left, right=control_right)
         if control is None:
             return "skip", f"Skip (control bbox error): {font_path}"
 
@@ -416,8 +500,14 @@ def main() -> None:
     parser.add_argument(
         "--charset",
         type=str,
-        default=CHARSET,
-        help="Characters to render into the atlas.",
+        default=None,
+        help="Custom characters to render into the atlas (overrides --charsets).",
+    )
+    parser.add_argument(
+        "--charsets",
+        type=str,
+        default=DEFAULT_CHARSETS,
+        help="Comma-separated preset charsets to render: latin,cyrillic (ignored if --charset is set).",
     )
     parser.add_argument(
         "--processed-dir",
@@ -436,10 +526,38 @@ def main() -> None:
         default=max(1, (os.cpu_count() or 2) - 1),
         help="Number of parallel workers (set 1 to disable multiprocessing).",
     )
+    parser.add_argument(
+        "--baseline",
+        type=float,
+        default=DEFAULT_BASELINE,
+        help="Baseline position within each cell as a fraction of cell height (0-1).",
+    )
+    parser.add_argument(
+        "--atlas-fill-ratio",
+        type=float,
+        default=DEFAULT_ATLAS_FILL_RATIO,
+        help="How much each atlas cell is filled by glyph bounds (0-1).",
+    )
+    parser.add_argument(
+        "--descender-chars",
+        type=str,
+        default=DEFAULT_DESCENDER_CHARS,
+        help="Characters to shift slightly upward in atlas rendering.",
+    )
+    parser.add_argument(
+        "--descender-lift",
+        type=float,
+        default=DEFAULT_DESCENDER_LIFT,
+        help="Upward shift for descender chars, as a fraction of cell height.",
+    )
     args = parser.parse_args()
 
-    if not args.charset:
-        raise SystemExit("charset is empty")
+    if args.baseline <= 0 or args.baseline >= 1:
+        raise SystemExit("baseline must be between 0 and 1")
+    if args.atlas_fill_ratio <= 0 or args.atlas_fill_ratio >= 1:
+        raise SystemExit("atlas-fill-ratio must be between 0 and 1")
+    if args.descender_lift < 0:
+        raise SystemExit("descender-lift must be >= 0")
 
     if args.output_dir is None:
         raw = input("Output directory: ").strip()
@@ -468,10 +586,17 @@ def main() -> None:
     targets_dir.mkdir(parents=True, exist_ok=True)
     controls_dir.mkdir(parents=True, exist_ok=True)
 
-    grid = compute_grid(len(args.charset), args.canvas, args.canvas)
-    prompt_text = (
-        'Generate letters and symbols "' + args.charset + '" in the style of the letters given to you as a reference.'
-    )
+    if args.charset:
+        charset_sets = [("custom", args.charset)]
+    else:
+        names = [name.strip().lower() for name in args.charsets.split(",") if name.strip()]
+        if not names:
+            raise SystemExit("charsets list is empty")
+        charset_sets = []
+        for name in names:
+            if name not in PRESET_CHARSETS:
+                raise SystemExit(f"Unknown charset preset: {name}")
+            charset_sets.append((name, PRESET_CHARSETS[name]))
     used_names: dict[str, int] = {}
     processed = 0
     skipped = 0
@@ -480,6 +605,7 @@ def main() -> None:
         print(f"Loaded {len(custom_jsons)} custom jsons from {args.processed_dir}")
 
     tasks: list[dict] = []
+    multiple_sets = len(charset_sets) > 1
     for entry in entries:
         font_path = entry["path"]
         glyphs = entry.get("glyphs")
@@ -487,20 +613,35 @@ def main() -> None:
             skipped += 1
             continue
         safe_base = sanitize_name(font_path.stem)
-        safe_name = unique_name(safe_base, used_names)
-        tasks.append(
-            {
-                "font_path": font_path,
-                "safe_name": safe_name,
-                "charset": args.charset,
-                "canvas": args.canvas,
-                "grid": grid,
-                "targets_dir": targets_dir,
-                "controls_dir": controls_dir,
-                "prompt_text": prompt_text,
-                "glyphs": glyphs,
-            }
-        )
+        for label, charset in charset_sets:
+            grid = compute_grid(len(charset), args.canvas, args.canvas)
+            prompt_text = (
+                'Generate letters and symbols "'
+                + charset
+                + '" in the style of the letters given to you as a reference.'
+            )
+            control_left, control_right = pick_control_pair(label, charset)
+            name_base = f"{safe_base}_{label}" if multiple_sets else safe_base
+            safe_name = unique_name(name_base, used_names)
+            tasks.append(
+                {
+                    "font_path": font_path,
+                    "safe_name": safe_name,
+                    "charset": charset,
+                    "canvas": args.canvas,
+                    "grid": grid,
+                    "targets_dir": targets_dir,
+                    "controls_dir": controls_dir,
+                    "prompt_text": prompt_text,
+                    "glyphs": glyphs,
+                    "baseline_ratio": args.baseline,
+                    "atlas_fill_ratio": args.atlas_fill_ratio,
+                    "descender_chars": args.descender_chars,
+                    "descender_lift": args.descender_lift,
+                    "control_left": control_left,
+                    "control_right": control_right,
+                }
+            )
 
     if args.workers < 1:
         args.workers = 1
