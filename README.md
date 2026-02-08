@@ -30,6 +30,10 @@ scikit-image
 tqdm
 ```
 
+**For `--no-upscale` workflow this is enough (recommended).**
+
+**`flux_upscale.py` is currently experimental and may not improve quality yet.**
+
 ## Setup
 
 ```powershell
@@ -116,4 +120,5 @@ python flux_pipeline.py ^
 
 ## License
 MIT
+
 
