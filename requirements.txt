@@ -3,23 +3,3 @@ pillow
 fonttools
 scikit-image
 tqdm
-
-
-python flux_pipeline.py ^
-  --input "G:\Programs\Ref2Font\Example_3_Output.png" ^
-  --output-dir "G:\Programs\Ref2Font\test" ^
-  --no-upscale ^
-  --use-grid ^
-  --vectorize contours ^
-  --simplify 0.5 ^
-  --canvas 1024 ^
-  --contour-level 0.5 ^
-  --trace-scale 4 ^
-  --trace-blur 1.0 ^
-  --smooth-iters 2 ^
-  --baseline-mode auto ^
-  --baseline-quantile 0.9 ^
-  --baseline-min-pixels 20 ^
-  --cols 8 ^
-  --rows 9 ^
-  --no-auto-invert
