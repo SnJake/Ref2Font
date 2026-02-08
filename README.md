@@ -10,6 +10,8 @@ This repository contains the **V2** of the **contextual LoRA** trained for **bla
 - **Examples**: `Example/` (input images + generated atlases)
 - **Post-processing scripts**: `flux_pipeline.py`, `flux_grid_to_ttf.py`, `flux_upscale.py`
 
+> Disclaimer: it works **well**, but **not perfectly**. Expect occasional artifacts.
+
 ## Examples
 <img width="2560" height="1280" alt="Example_1_C" src="https://github.com/user-attachments/assets/d9064bbf-f3e9-4753-abbe-af2e83493746" />
 
@@ -114,3 +116,4 @@ python flux_pipeline.py ^
 
 ## License
 MIT
+
