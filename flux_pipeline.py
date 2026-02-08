@@ -6,7 +6,6 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-import flux_upscale
 import numpy as np
 from PIL import Image
 
@@ -18,6 +17,13 @@ def sanitize_name(value: str) -> str:
     value = re.sub(r"[^a-zA-Z0-9_]+", "_", value)
     value = value.strip("_")
     return value or "font"
+
+
+def iter_images(input_path: Path) -> list[Path]:
+    if input_path.is_file():
+        return [input_path]
+    exts = {".png", ".jpg", ".jpeg", ".webp"}
+    return sorted([p for p in input_path.rglob("*") if p.suffix.lower() in exts])
 
 
 def build_atlas_cmd(
@@ -228,20 +234,27 @@ def main() -> None:
     if args.use_grid and not grid_script.exists():
          raise SystemExit(f"flux_grid_to_ttf.py not found: {grid_script}")
 
-    upscaled_dir = Path(args.upscaled_dir) if args.upscaled_dir else output_dir / "upscaled"
-    upscaled_dir.mkdir(parents=True, exist_ok=True)
-
     debug_dir = Path(args.debug_dir) if args.debug_dir else None
     if debug_dir is not None:
         debug_dir.mkdir(parents=True, exist_ok=True)
 
-    images = flux_upscale.iter_images(input_path)
+    images = iter_images(input_path)
     if not images:
         raise SystemExit("No input images found")
 
     if args.no_upscale:
         upscaled_images = images
     else:
+        upscaled_dir = Path(args.upscaled_dir) if args.upscaled_dir else output_dir / "upscaled"
+        upscaled_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            import flux_upscale
+        except ModuleNotFoundError as exc:
+            raise SystemExit(
+                "Upscaling requires optional dependencies (torch + FontNN module). "
+                "Use --no-upscale to skip it, or install/configure upscaler environment."
+            ) from exc
+
         model, _ = flux_upscale.load_checkpoint(Path(args.model))
         device = flux_upscale.choose_device(args.device)
         model = model.to(device)
