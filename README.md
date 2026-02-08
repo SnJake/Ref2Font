@@ -84,7 +84,30 @@ Place in: `ComfyUI/models/loras`
 ## Post-processing: Atlas → TTF
 After you generate the atlas, use the pipeline script to convert the atlas into a TTF font.
 
-### Example command (Windows)
+### Example commands (Windows)
+
+```powershell
+python flux_pipeline.py ^
+  --input "path\to\your_atlas.png" ^
+  --output-dir "output\folder" ^
+  --no-upscale ^
+  --use-grid ^
+  --simplify 0.5 ^
+  --canvas 1280 ^
+  --contour-level 0.5 ^
+  --trace-scale 4 ^
+  --trace-blur 1.0 ^
+  --smooth-iters 2 ^
+  --baseline-mode auto ^
+  --keep-components 4 ^
+  --min-component-area 3 ^
+  --component-center-bias 0.65 ^
+  --cell-bleed 0.4 ^
+  --cell-bleed-max 10 ^
+  --core-overlap-min 0.35 ^
+  --no-auto-invert
+```
+
 ```powershell
 python flux_pipeline.py ^
   --input "path\to\your_atlas.png" ^
@@ -120,5 +143,6 @@ python flux_pipeline.py ^
 
 ## License
 MIT
+
 
 
