@@ -640,7 +640,8 @@ def main() -> None:
             version="Version 1.0",
         )
     )
-    fb.setupPost()
+    # Use post format 3.0 to avoid latin-1 glyph-name constraints.
+    fb.setupPost(keepGlyphNames=False)
 
     glyph_dict = {}
     metrics = {}
