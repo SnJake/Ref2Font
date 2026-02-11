@@ -9,15 +9,27 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 
-LATIN_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"
+LATIN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"&'
 CYRILLIC_CHARSET = (
     "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
     "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-    "0123456789!?.,;:-"
+    '0123456789!?.,;:-"&'
 )
 PRESET_CHARSETS: dict[str, str] = {
     "latin": LATIN_CHARSET,
     "cyrillic": CYRILLIC_CHARSET,
+}
+PROMPT_BY_LABEL: dict[str, str] = {
+    "latin": (
+        'A technical font atlas grid of the Latin charset: "'
+        + LATIN_CHARSET
+        + '". The style is strictly derived from the reference image "Aa".'
+    ),
+    "cyrillic": (
+        'A technical font atlas grid of the Cyrillic charset: "'
+        + CYRILLIC_CHARSET
+        + '". The style is strictly derived from the reference image "Аа".'
+    ),
 }
 DEFAULT_CHARSETS = "latin,cyrillic"
 DEFAULT_BASELINE = 0.75
@@ -434,11 +446,13 @@ def process_font(task: dict) -> tuple[str, str | None]:
     prompt_path = targets_dir / f"{safe_name}.txt"
 
     try:
-        if glyphs is not None:
-            if not set(charset).issubset(glyphs):
-                return "skip", f"Skip (missing glyphs from json): {font_path}"
+        if glyphs is not None and set(charset).issubset(glyphs):
+            pass
         else:
+            # JSON glyph metadata can be stale/incomplete; validate against the real font cmap.
             if not supports_charset(font_path, charset):
+                if glyphs is not None:
+                    return "skip", f"Skip (missing glyphs: json+cmap): {font_path}"
                 return "skip", f"Skip (missing glyphs): {font_path}"
         atlas_font = choose_font(
             font_path,
@@ -501,13 +515,20 @@ def main() -> None:
         "--charset",
         type=str,
         default=None,
-        help="Custom characters to render into the atlas (overrides --charsets).",
+        help="Custom characters to render into the atlas (overrides --charsets and --languages).",
     )
     parser.add_argument(
         "--charsets",
         type=str,
         default=DEFAULT_CHARSETS,
-        help="Comma-separated preset charsets to render: latin,cyrillic (ignored if --charset is set).",
+        help="Comma-separated preset charsets to render: latin,cyrillic (ignored if --charset or --languages is set).",
+    )
+    parser.add_argument(
+        "--languages",
+        type=str,
+        nargs="*",
+        default=None,
+        help="Optional languages to render: latin cyrillic. Default is both if omitted.",
     )
     parser.add_argument(
         "--processed-dir",
@@ -589,9 +610,18 @@ def main() -> None:
     if args.charset:
         charset_sets = [("custom", args.charset)]
     else:
-        names = [name.strip().lower() for name in args.charsets.split(",") if name.strip()]
+        if args.languages is not None:
+            names = []
+            for token in args.languages:
+                names.extend(part.strip().lower() for part in token.split(",") if part.strip())
+            if not names:
+                names = ["latin", "cyrillic"]
+        else:
+            names = [name.strip().lower() for name in args.charsets.split(",") if name.strip()]
         if not names:
             raise SystemExit("charsets list is empty")
+        # Keep order, drop duplicates.
+        names = list(dict.fromkeys(names))
         charset_sets = []
         for name in names:
             if name not in PRESET_CHARSETS:
@@ -600,12 +630,12 @@ def main() -> None:
     used_names: dict[str, int] = {}
     processed = 0
     skipped = 0
+    skipped_existing = 0
 
     if custom_jsons:
         print(f"Loaded {len(custom_jsons)} custom jsons from {args.processed_dir}")
 
     tasks: list[dict] = []
-    multiple_sets = len(charset_sets) > 1
     for entry in entries:
         font_path = entry["path"]
         glyphs = entry.get("glyphs")
@@ -615,14 +645,24 @@ def main() -> None:
         safe_base = sanitize_name(font_path.stem)
         for label, charset in charset_sets:
             grid = compute_grid(len(charset), args.canvas, args.canvas)
-            prompt_text = (
-                'Generate letters and symbols "'
-                + charset
-                + '" in the style of the letters given to you as a reference.'
+            prompt_text = PROMPT_BY_LABEL.get(
+                label,
+                (
+                    'Generate letters and symbols "'
+                    + charset
+                    + '" in the style of the letters given to you as a reference.'
+                ),
             )
             control_left, control_right = pick_control_pair(label, charset)
-            name_base = f"{safe_base}_{label}" if multiple_sets else safe_base
+            name_base = f"{safe_base}_{label}"
             safe_name = unique_name(name_base, used_names)
+            target_path = targets_dir / f"{safe_name}.webp"
+            control_path = controls_dir / f"{safe_name}.webp"
+            prompt_path = targets_dir / f"{safe_name}.txt"
+            if target_path.exists() and control_path.exists() and prompt_path.exists():
+                skipped += 1
+                skipped_existing += 1
+                continue
             tasks.append(
                 {
                     "font_path": font_path,
@@ -669,7 +709,7 @@ def main() -> None:
                             tqdm.write(message)
                     pbar.update(1)
 
-    print(f"Done. Processed: {processed}. Skipped: {skipped}.")
+    print(f"Done. Processed: {processed}. Skipped: {skipped}. Existing skipped: {skipped_existing}.")
 
 
 if __name__ == "__main__":
