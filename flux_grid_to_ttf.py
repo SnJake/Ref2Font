@@ -162,6 +162,8 @@ def draw_glyph_fixed_grid(
     pixel_baseline: float,
     cell_width_ref: int,
     y_shift_px: float = 0.0,
+    align_mode: str = "geometric",
+    visual_center_x: float | None = None,
 ) -> int:
     """
     Рисует глиф, полагаясь на координаты внутри ячейки, а не на bbox глифа.
@@ -174,38 +176,55 @@ def draw_glyph_fixed_grid(
     if not contours:
         return int(cell_width_ref * scale * 0.5)
 
-    # Вычисляем ширину глифа для Advance Width (отступ справа)
-    # Но рисуем все равно относительно 0,0 ячейки
+    # Compute glyph bounds in cell-local coordinates.
     g_min_x = float("inf")
     g_max_x = float("-inf")
     for contour in contours:
         xs = contour[:, 0]
         g_min_x = min(g_min_x, xs.min())
         g_max_x = max(g_max_x, xs.max())
+    content_width = max(0.0, g_max_x - g_min_x)
+
+    x_anchor = g_min_x
+    if align_mode == "visual" and visual_center_x is not None:
+        # Keep advance width from geometric bounds, but center by visual mass.
+        x_anchor = float(visual_center_x) - (content_width * 0.5)
 
     for contour in contours:
         # contour points are in cell-local coordinates (0..cell_w, 0..cell_h)
         # Convert to TTF coords (Y up). 0 is the baseline.
         # Formula: (pixel_baseline - y) * scale
         start_pt = contour[0]
-        sx = (start_pt[0] - g_min_x) * scale + side_bearing
+        sx = (start_pt[0] - x_anchor) * scale + side_bearing
         sy = (pixel_baseline - (start_pt[1] - y_shift_px)) * scale
         pen.moveTo((sx, sy))
 
         for pt in contour[1:]:
-            px = (pt[0] - g_min_x) * scale + side_bearing
+            px = (pt[0] - x_anchor) * scale + side_bearing
             py = (pixel_baseline - (pt[1] - y_shift_px)) * scale
             pen.lineTo((px, py))
         pen.closePath()
     
     # Advance width: ширина контента + боковые отступы
     # Либо фиксированная ширина ячейки, если шрифт моноширинный
-    content_width = max(0, g_max_x - g_min_x)
+    content_width = max(0.0, g_max_x - g_min_x)
     
     # Если хотим "плотный" шрифт, берем ширину контента.
     # Если хотим, как в атласе (моноширинно), берем cell_width_ref.
     # Обычно для Flux атласов лучше брать контент + bearing, иначе пробелы огромные.
     return int(content_width * scale + 2 * side_bearing)
+
+
+def visual_centroid_from_cell(cell_img: Image.Image, invert: bool, threshold: int) -> tuple[float, float] | None:
+    arr = np.array(cell_img.convert("L"))
+    if invert:
+        fg = arr < threshold
+    else:
+        fg = arr > threshold
+    ys, xs = np.where(fg)
+    if xs.size == 0:
+        return None
+    return (float(xs.mean()) + 0.5, float(ys.mean()) + 0.5)
 
 def contours_bounds(contours: list[np.ndarray]) -> tuple[float, float, float, float] | None:
     if not contours:
@@ -353,6 +372,12 @@ def main() -> None:
     # Metrics
     parser.add_argument("--upm", type=int, default=1024)
     parser.add_argument("--side-bearing", type=int, default=40)
+    parser.add_argument(
+        "--align-mode",
+        choices=["geometric", "visual"],
+        default="geometric",
+        help="Horizontal alignment mode: geometric bbox-left or visual centroid-center.",
+    )
     parser.add_argument("--baseline-ratio", type=float, default=0.75, help="Where is the baseline in the cell (0.0 top, 1.0 bottom)")
     parser.add_argument("--baseline-mode", choices=["fixed", "auto"], default="fixed", help="Baseline mode for grid alignment.")
     parser.add_argument("--baseline-quantile", type=float, default=0.9, help="Quantile for auto baseline (0..1).")
@@ -536,6 +561,11 @@ def main() -> None:
             smooth_iters=args.smooth_iters,
             invert=contour_invert,
         )
+        visual_center_x = None
+        visual_centroid = visual_centroid_from_cell(cell_img, contour_invert, args.threshold)
+        if visual_centroid is not None:
+            vcx, _vcy = visual_centroid
+            visual_center_x = float(vcx)
         if ex0 != x0 or ey0 != y0:
             dx = float(ex0 - x0)
             dy = float(ey0 - y0)
@@ -546,6 +576,8 @@ def main() -> None:
                 pts[:, 1] += dy
                 shifted.append(pts)
             contours = shifted
+            if visual_center_x is not None:
+                visual_center_x += dx
 
         baseline_px = float(row_baselines.get(row, cell_h * baseline_ratio_used))
         y_shift_px = float(cell_h * args.descender_lift) if ch in descender_chars else 0.0
@@ -564,6 +596,7 @@ def main() -> None:
                 "contours": contours,
                 "baseline_px": baseline_px,
                 "y_shift_px": y_shift_px,
+                "visual_center_x": visual_center_x,
             }
         )
 
@@ -607,7 +640,8 @@ def main() -> None:
             version="Version 1.0",
         )
     )
-    fb.setupPost()
+    # Use post format 3.0 to avoid latin-1 glyph-name constraints.
+    fb.setupPost(keepGlyphNames=False)
 
     glyph_dict = {}
     metrics = {}
@@ -636,6 +670,8 @@ def main() -> None:
             glyph_entry["baseline_px"],
             cell_w,
             y_shift_px=glyph_entry["y_shift_px"],
+            align_mode=args.align_mode,
+            visual_center_x=glyph_entry.get("visual_center_x"),
         )
 
         glyph_dict[ch] = pen.glyph()

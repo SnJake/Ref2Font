@@ -370,63 +370,7 @@
         "secondTabOffset": 80,
         "secondTabWidth": 65
       },
-      "widgets_values": [
-        "width: 1280, height: 1280\n batch size: 1"
-      ]
-    },
-    {
-      "id": 113,
-      "type": "CLIPTextEncode",
-      "pos": [
-        -83.98664764871904,
-        2063.9527900037456
-      ],
-      "size": [
-        432.6423176383713,
-        204.3198731134912
-      ],
-      "flags": {},
-      "order": 13,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 223
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            192
-          ]
-        }
-      ],
-      "title": "CLIP Text Encode ( Negative Prompt)",
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.9.1",
-        "Node name for S&R": "CLIPTextEncode",
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.5.1",
-          "input_ue_unconnectable": {}
-        },
-        "enableTabs": false,
-        "tabWidth": 65,
-        "tabXOffset": 10,
-        "hasSecondTab": false,
-        "secondTabText": "Send Back",
-        "secondTabOffset": 80,
-        "secondTabWidth": 65
-      },
-      "widgets_values": [
-        "jpeg compression, jpeg artifacts, bad quality, poor details, low quality, low bitrate artifacts, noise"
-      ],
-      "color": "#322",
-      "bgcolor": "#533"
+      "widgets_values": []
     },
     {
       "id": 101,
@@ -754,35 +698,6 @@
       ]
     },
     {
-      "id": 119,
-      "type": "Note",
-      "pos": [
-        -93.58127644036442,
-        1413.18897279492
-      ],
-      "size": [
-        391.5281311326305,
-        188.93940923966898
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [],
-      "title": "Prompt",
-      "properties": {
-        "ue_properties": {
-          "version": "7.0.1",
-          "widget_ue_connectable": {}
-        }
-      },
-      "widgets_values": [
-        "Prompt always should be: Generate letters and symbols \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-\" in the style of the letters given to you as a reference."
-      ],
-      "color": "#432",
-      "bgcolor": "#653"
-    },
-    {
       "id": 112,
       "type": "CLIPTextEncode",
       "pos": [
@@ -974,7 +889,7 @@
         82
       ],
       "flags": {},
-      "order": 7,
+      "order": 6,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -1043,6 +958,176 @@
       "widgets_values": []
     },
     {
+      "id": 129,
+      "type": "Note",
+      "pos": [
+        -427.54041398151946,
+        1463.1601099098668
+      ],
+      "size": [
+        210,
+        88
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "LoRA Strength",
+      "properties": {
+        "ue_properties": {
+          "version": "7.0.1",
+          "widget_ue_connectable": {}
+        }
+      },
+      "widgets_values": [
+        "Strength between 0.80 and 1.0"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 123,
+      "type": "Note",
+      "pos": [
+        -1107.0651476564788,
+        2112.3668258412813
+      ],
+      "size": [
+        210,
+        88
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Input",
+      "properties": {
+        "ue_properties": {
+          "version": "7.0.1",
+          "widget_ue_connectable": {}
+        }
+      },
+      "widgets_values": [
+        "Input image"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 130,
+      "type": "Note",
+      "pos": [
+        -759.3691594482447,
+        2107.6870904970438
+      ],
+      "size": [
+        210,
+        88
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Scale",
+      "properties": {
+        "ue_properties": {
+          "version": "7.0.1",
+          "widget_ue_connectable": {}
+        }
+      },
+      "widgets_values": [
+        "If your input image is more or less than 1280x1280"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 119,
+      "type": "Note",
+      "pos": [
+        -93.58127644036442,
+        1413.18897279492
+      ],
+      "size": [
+        457.57994881691525,
+        197.50168190244653
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Prompt",
+      "properties": {
+        "ue_properties": {
+          "version": "7.0.1",
+          "widget_ue_connectable": {}
+        }
+      },
+      "widgets_values": [
+        "Prompt always should be: \n\nA technical font atlas grid of the Latin charset: \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-\"&\". The style is strictly derived from the reference image \"Aa\".\n\n---\n\nA technical font atlas grid of the Cyrillic charset: \"АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789!?.,;:-\"&\". The style is strictly derived from the reference image \"Аа\"."
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 113,
+      "type": "CLIPTextEncode",
+      "pos": [
+        -83.98664764871904,
+        2063.9527900037456
+      ],
+      "size": [
+        432.6423176383713,
+        204.3198731134912
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 223
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            192
+          ]
+        }
+      ],
+      "title": "CLIP Text Encode ( Negative Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.9.1",
+        "Node name for S&R": "CLIPTextEncode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        },
+        "enableTabs": false,
+        "tabWidth": 65,
+        "tabXOffset": 10,
+        "hasSecondTab": false,
+        "secondTabText": "Send Back",
+        "secondTabOffset": 80,
+        "secondTabWidth": 65
+      },
+      "widgets_values": [
+        "jpeg compression, jpeg artifacts, bad quality, poor details, low quality, low bitrate artifacts, noise, colorful, colored"
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
       "id": 122,
       "type": "LoraLoaderModelOnly",
       "pos": [
@@ -1083,96 +1168,9 @@
         }
       },
       "widgets_values": [
-        "Klein9B\\Ref2FontV2.safetensors",
-        0.8
+        "Klein9B\\Ref2FontV3.safetensors",
+        1
       ]
-    },
-    {
-      "id": 129,
-      "type": "Note",
-      "pos": [
-        -427.54041398151946,
-        1463.1601099098668
-      ],
-      "size": [
-        210,
-        88
-      ],
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [],
-      "title": "LoRA Strength",
-      "properties": {
-        "ue_properties": {
-          "version": "7.0.1",
-          "widget_ue_connectable": {}
-        }
-      },
-      "widgets_values": [
-        "Strength between 0.80 and 1.0"
-      ],
-      "color": "#432",
-      "bgcolor": "#653"
-    },
-    {
-      "id": 123,
-      "type": "Note",
-      "pos": [
-        -1107.0651476564788,
-        2112.3668258412813
-      ],
-      "size": [
-        210,
-        88
-      ],
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [],
-      "title": "Input",
-      "properties": {
-        "ue_properties": {
-          "version": "7.0.1",
-          "widget_ue_connectable": {}
-        }
-      },
-      "widgets_values": [
-        "Input image"
-      ],
-      "color": "#432",
-      "bgcolor": "#653"
-    },
-    {
-      "id": 130,
-      "type": "Note",
-      "pos": [
-        -759.3691594482447,
-        2107.6870904970438
-      ],
-      "size": [
-        210,
-        88
-      ],
-      "flags": {},
-      "order": 10,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [],
-      "title": "Scale",
-      "properties": {
-        "ue_properties": {
-          "version": "7.0.1",
-          "widget_ue_connectable": {}
-        }
-      },
-      "widgets_values": [
-        "If your input image is more or less than 1280x1280"
-      ],
-      "color": "#432",
-      "bgcolor": "#653"
     }
   ],
   "links": [
@@ -1751,10 +1749,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 1.1167815779425256,
+      "scale": 1.4864362802415039,
       "offset": [
-        -444.01276638262806,
-        -1696.0018291694244
+        971.8813145301816,
+        -1288.0143083957798
       ]
     },
     "frontendVersion": "1.37.11",

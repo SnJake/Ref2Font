@@ -8,7 +8,16 @@ from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
 
-CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"
+LATIN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"&'
+CYRILLIC_CHARSET = (
+    "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+    "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+    '0123456789!?.,;:-"&'
+)
+PRESET_CHARSETS: dict[str, str] = {
+    "latin": LATIN_CHARSET,
+    "cyrillic": CYRILLIC_CHARSET,
+}
 
 
 @dataclass
@@ -165,6 +174,13 @@ def mask_to_rects(mask: np.ndarray) -> list[tuple[int, int, int, int]]:
     return rects
 
 
+def mask_visual_centroid_x(mask: np.ndarray) -> float | None:
+    ys, xs = np.where(mask)
+    if xs.size == 0:
+        return None
+    return float(xs.mean()) + 0.5
+
+
 def draw_debug(image: Image.Image, glyphs: list[GlyphInfo], out_path: Path) -> None:
     if not glyphs:
         return
@@ -186,7 +202,13 @@ def main() -> None:
     parser.add_argument("--image", required=True, help="Path to atlas image (white on black or black on white).")
     parser.add_argument("--output-dir", required=True, help="Output directory for the generated TTF.")
     parser.add_argument("--font-name", default="AtlasFont", help="Font family name.")
-    parser.add_argument("--charset", default=CHARSET, help="Characters in reading order.")
+    parser.add_argument(
+        "--language",
+        choices=["latin", "cyrillic"],
+        default="latin",
+        help="Preset charset language used when --charset is not provided.",
+    )
+    parser.add_argument("--charset", default=None, help="Characters in reading order (overrides --language).")
     parser.add_argument("--threshold", type=int, default=127, help="Binarization threshold (0-255).")
     parser.add_argument("--row-gap", type=int, default=2, help="Max empty row gap to merge row bands.")
     parser.add_argument("--gap-threshold", type=int, default=0, help="Column projection <= value treated as gap.")
@@ -195,8 +217,16 @@ def main() -> None:
     parser.add_argument("--upm", type=int, default=1024, help="Units per em.")
     parser.add_argument("--padding", type=float, default=0.05, help="Vertical padding ratio in em units.")
     parser.add_argument("--side-bearing", type=int, default=50, help="Left/right side bearing in font units.")
+    parser.add_argument(
+        "--align-mode",
+        choices=["geometric", "visual"],
+        default="geometric",
+        help="Horizontal alignment mode: geometric bbox-left or visual centroid-center.",
+    )
     parser.add_argument("--debug-dir", default=None, help="Optional directory to save debug images.")
     args = parser.parse_args()
+    if args.charset is None:
+        args.charset = PRESET_CHARSETS[args.language]
 
     image_path = Path(args.image)
     output_dir = Path(args.output_dir)
@@ -335,7 +365,8 @@ def main() -> None:
             version="Version 1.0",
         )
     )
-    fb.setupPost()
+    # Use post format 3.0 to avoid latin-1 glyph-name constraints.
+    fb.setupPost(keepGlyphNames=False)
 
     glyph_dict = {}
     metrics = {}
@@ -353,9 +384,15 @@ def main() -> None:
     for glyph in glyphs:
         pen = TTGlyphPen(None)
         rects = mask_to_rects(glyph.mask)
+        content_width = float(glyph.mask.shape[1])
+        x_anchor = 0.0
+        if args.align_mode == "visual":
+            visual_center_x = mask_visual_centroid_x(glyph.mask)
+            if visual_center_x is not None:
+                x_anchor = float(visual_center_x) - (content_width * 0.5)
         for x0, y0, x1, y1 in rects:
-            fx0 = x0 * scale + args.side_bearing
-            fx1 = x1 * scale + args.side_bearing
+            fx0 = (x0 - x_anchor) * scale + args.side_bearing
+            fx1 = (x1 - x_anchor) * scale + args.side_bearing
             fy0 = (glyph.baseline - y0) * scale
             fy1 = (glyph.baseline - y1) * scale
             if fx0 == fx1 or fy0 == fy1:

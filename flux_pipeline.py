@@ -67,6 +67,8 @@ def build_atlas_cmd(
         str(args.padding),
         "--side-bearing",
         str(args.side_bearing),
+        "--align-mode",
+        str(args.align_mode),
     ]
     if use_grid:
         cmd.extend(["--canvas", str(args.canvas)])
@@ -148,6 +150,12 @@ def main() -> None:
     parser.add_argument("--upm", type=int, default=1024)
     parser.add_argument("--padding", type=float, default=0.05)
     parser.add_argument("--side-bearing", type=int, default=50)
+    parser.add_argument(
+        "--align-mode",
+        choices=["geometric", "visual"],
+        default="geometric",
+        help="Horizontal glyph alignment mode for atlas->TTF conversion.",
+    )
     parser.add_argument("--debug-dir", default=None)
 
     parser.add_argument("--use-grid", action="store_true", help="Use grid-based atlas to TTF conversion.")
