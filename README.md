@@ -20,6 +20,11 @@ This repository contains the **V3** of the **contextual LoRA** trained for **bla
 
 ## Examples
 
+<img width="2560" height="2560" alt="Example_3_C" src="https://github.com/user-attachments/assets/c47dfb37-1e25-434a-bd0d-6e6057ee020c" />
+
+<img width="2560" height="2560" alt="Example_5_C" src="https://github.com/user-attachments/assets/41634405-5019-4e26-bdc3-8c9e6add55e5" />
+
+<img width="2560" height="2560" alt="Example_6_C" src="https://github.com/user-attachments/assets/518fe0b2-5a5b-48a8-8aff-28050c107028" />
 
 ## Requirements
 The post-processing scripts require Python 3.10+ and these packages:
@@ -158,6 +163,7 @@ python flux_pipeline.py ^
 
 ## License
 MIT
+
 
 
 
