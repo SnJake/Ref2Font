@@ -81,11 +81,11 @@ Place in: `ComfyUI/models/loras`
 ## ⚠️ IMPORTANT: V3 Required Prompts
 To get the correct grid layout and character sequence, you **must** use these specific prompts depending on your target language:
 
-### For Latin (English, etc.):
+### For Latin (English):
 **Reference image must contain "Aa"**
 > A technical font atlas grid of the Latin charset: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"&". The style is strictly derived from the reference image "Aa".
 
-### For Cyrillic (Russian, etc.):
+### For Cyrillic (Russian):
 **Reference image must contain "Аа"**
 > A technical font atlas grid of the Cyrillic charset: "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789!?.,;:-"&". The style is strictly derived from the reference image "Аа".
 
@@ -158,6 +158,7 @@ python flux_pipeline.py ^
 
 ## License
 MIT
+
 
 
 
