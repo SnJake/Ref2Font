@@ -3,9 +3,10 @@
 This repository contains the **V3** of the **contextual LoRA** trained for **black-forest-labs/FLUX.2-klein-9B**. It generates **1280×1280 font atlases** from a single reference image "Aa".
 
 **Update V3 (Latest):** 
-- **Cyrillic Support:** Full support for Russian, Ukrainian, and other Cyrillic-based scripts.
+- **Cyrillic Support:** Full support for Russian.
 - **Expanded Charset:** Added `"` (double quote) and `&` (ampersand) to all atlases.
 - **Updated Prompts:** New specific prompts for different charsets to ensure mapping stability.
+- **Straighter Letters:** Improved alignment and reduced "jitter" in atlas generation.
 
 **Update V2:** Fixed dataset generation issues, increased resolution to 1280px, and improved vectorization scripts.
 
@@ -157,6 +158,7 @@ python flux_pipeline.py ^
 
 ## License
 MIT
+
 
 
 
