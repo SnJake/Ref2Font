@@ -698,61 +698,6 @@
       ]
     },
     {
-      "id": 112,
-      "type": "CLIPTextEncode",
-      "pos": [
-        -84.10818653706063,
-        1696.151092162754
-      ],
-      "size": [
-        440,
-        320
-      ],
-      "flags": {},
-      "order": 12,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 222
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "slot_index": 0,
-          "links": [
-            191
-          ]
-        }
-      ],
-      "title": "CLIP Text Encode (Positive Prompt)",
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.8.2",
-        "Node name for S&R": "CLIPTextEncode",
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.5.1",
-          "input_ue_unconnectable": {}
-        },
-        "enableTabs": false,
-        "tabWidth": 65,
-        "tabXOffset": 10,
-        "hasSecondTab": false,
-        "secondTabText": "Send Back",
-        "secondTabOffset": 80,
-        "secondTabWidth": 65
-      },
-      "widgets_values": [
-        "Prompt always should be: Generate letters and symbols \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-\" in the style of the letters given to you as a reference."
-      ],
-      "color": "#232",
-      "bgcolor": "#353"
-    },
-    {
       "id": 114,
       "type": "CFGGuider",
       "pos": [
@@ -1045,35 +990,6 @@
       "bgcolor": "#653"
     },
     {
-      "id": 119,
-      "type": "Note",
-      "pos": [
-        -93.58127644036442,
-        1413.18897279492
-      ],
-      "size": [
-        457.57994881691525,
-        197.50168190244653
-      ],
-      "flags": {},
-      "order": 10,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [],
-      "title": "Prompt",
-      "properties": {
-        "ue_properties": {
-          "version": "7.0.1",
-          "widget_ue_connectable": {}
-        }
-      },
-      "widgets_values": [
-        "Prompt always should be: \n\nA technical font atlas grid of the Latin charset: \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-\"&\". The style is strictly derived from the reference image \"Aa\".\n\n---\n\nA technical font atlas grid of the Cyrillic charset: \"АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789!?.,;:-\"&\". The style is strictly derived from the reference image \"Аа\"."
-      ],
-      "color": "#432",
-      "bgcolor": "#653"
-    },
-    {
       "id": 113,
       "type": "CLIPTextEncode",
       "pos": [
@@ -1171,6 +1087,90 @@
         "Klein9B\\Ref2FontV3.safetensors",
         1
       ]
+    },
+    {
+      "id": 119,
+      "type": "Note",
+      "pos": [
+        -93.58127644036442,
+        1413.18897279492
+      ],
+      "size": [
+        457.57994881691525,
+        197.50168190244653
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Prompt",
+      "properties": {
+        "ue_properties": {
+          "version": "7.0.1",
+          "widget_ue_connectable": {}
+        }
+      },
+      "widgets_values": [
+        "Prompt always should be: \n\nA technical font atlas grid of the Latin charset: \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-\"&\". The style is strictly derived from the reference image \"Aa\".\n\n---\n\nA technical font atlas grid of the Cyrillic charset: \"АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789!?.,;:-\"&\". The style is strictly derived from the reference image \"Аа\"."
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 112,
+      "type": "CLIPTextEncode",
+      "pos": [
+        -84.10818653706063,
+        1696.151092162754
+      ],
+      "size": [
+        440,
+        320
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 222
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            191
+          ]
+        }
+      ],
+      "title": "CLIP Text Encode (Positive Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.8.2",
+        "Node name for S&R": "CLIPTextEncode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        },
+        "enableTabs": false,
+        "tabWidth": 65,
+        "tabXOffset": 10,
+        "hasSecondTab": false,
+        "secondTabText": "Send Back",
+        "secondTabOffset": 80,
+        "secondTabWidth": 65
+      },
+      "widgets_values": [
+        ""
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
     }
   ],
   "links": [
@@ -1749,10 +1749,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 1.4864362802415039,
+      "scale": 0.9229599817706837,
       "offset": [
-        971.8813145301816,
-        -1288.0143083957798
+        1463.119882712441,
+        -995.4403274045849
       ]
     },
     "frontendVersion": "1.37.11",
