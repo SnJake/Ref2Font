@@ -1,6 +1,6 @@
 # Ref2Font V3 (FLUX.2 Klein 9B LoRA) — Contextual LoRA for Font Atlases
 
-This repository contains the **V3** of the **contextual LoRA** trained for **black-forest-labs/FLUX.2-klein-9B**. It generates **1280×1280 font atlases** from a single reference image "Aa".
+This repository contains **V3** of the contextual LoRA for **FLUX.2-klein-9B**. It generates **1280×1280 font atlases** from a single reference image (**"Aa"** for Latin or **"Аа"** for Cyrillic scripts).
 
 **Update V3 (Latest):** 
 - **Cyrillic Support:** Full support for Russian.
@@ -163,6 +163,7 @@ python flux_pipeline.py ^
 
 ## License
 MIT
+
 
 
 
