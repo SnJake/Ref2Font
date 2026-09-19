@@ -102,55 +102,97 @@ To get the correct grid layout and character sequence, you **must** use these sp
 ## Post-processing: Atlas → TTF
 After you generate the atlas, use the pipeline script to convert the atlas into a TTF font.
 
-### Example commands (Windows)
-`--align-mode geometric` keeps old bbox-based alignment. `--align-mode visual` centers glyphs by foreground centroid (recommended).
+### Improved glyph extraction and alignment
 
-```
-python flux_pipeline.py ^
-  --input "path\to\your_atlas.png" ^
-  --output-dir "output\folder" ^
-  --no-upscale ^
-  --use-grid ^
-  --simplify 0.5 ^
-  --canvas 1280 ^
-  --contour-level 0.5 ^
-  --trace-scale 4 ^
-  --trace-blur 1.0 ^
-  --smooth-iters 2 ^
-  --baseline-mode auto ^
-  --align-mode visual ^
-  --keep-components 4 ^
-  --min-component-area 3 ^
-  --component-center-bias 0.65 ^
-  --cell-bleed 0.4 ^
-  --cell-bleed-max 10 ^
-  --core-overlap-min 0.35 ^
-  --charset "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-""&" ^
-  --no-auto-invert
+Grid conversion now defaults to `--metrics-mode normalized`. It estimates shared
+capital and lowercase heights, aligns individual letters to the baseline, and
+handles Latin/Cyrillic accents, descenders and punctuation separately. Scaling
+preserves each drawing's proportions and is limited to 0.8–1.25 to avoid extreme
+corrections. This is a heuristic for these alphabets: unusual letterforms may
+still need manual editing. Use `--metrics-mode legacy` to keep atlas placement
+and the previous `--baseline-mode` / `--descender-lift` controls.
+
+Edge cleanup preserves antialiasing and rejects noise/neighbor-only components.
+Tracing closes contours at crop boundaries. `--edge-blur 0.45` smooths in source
+pixels; `--edge-blur 0` disables that smoothing. `--simplify` is now also measured
+in **source pixels** (default `0.25`), independent of `--trace-scale`; old numerical
+values therefore have a stronger effect. Horizontal metrics match actual outline
+bounds, including in visual alignment mode. Line metrics are shared by the TTF
+tables for more consistent text layout.
+
+The V3 character presets include quotes and ampersand. Use `--language cyrillic`
+for Russian or `--language latin` (default) for Latin. `--charset` overrides the
+preset; pass the original charset explicitly for older atlases without `"&`.
+
+### Example commands (Windows / PowerShell)
+
+Run from the repository root after installing `requirements.txt`. These commands
+use the tested V3 presets and normalized metrics. Component cleanup and automatic
+background detection are enabled by default; no upscaler model is required.
+
+**Cyrillic:**
+
+```powershell
+python flux_pipeline.py `
+  --input "Example/V3/Example_3_Output_Cyrillic.png" `
+  --output-dir "output/cyrillic" `
+  --no-upscale `
+  --use-grid `
+  --language cyrillic `
+  --metrics-mode normalized `
+  --align-mode geometric `
+  --edge-blur 0.45 `
+  --simplify 0.25 `
+  --trace-scale 8 `
+  --debug-dir "output/debug"
 ```
 
+**Latin:**
+
+```powershell
+python flux_pipeline.py `
+  --input "Example/V3/Example_3_Output_L.png" `
+  --output-dir "output/latin" `
+  --no-upscale `
+  --use-grid `
+  --language latin `
+  --metrics-mode normalized `
+  --align-mode geometric `
+  --edge-blur 0.45 `
+  --simplify 0.25 `
+  --trace-scale 8 `
+  --debug-dir "output/debug"
 ```
-python flux_pipeline.py ^
-  --input "path\to\your_atlas.png" ^
-  --output-dir "output\folder" ^
-  --no-upscale ^
-  --use-grid ^
-  --simplify 0.5 ^
-  --canvas 1280 ^
-  --contour-level 0.5 ^
-  --trace-scale 4 ^
-  --trace-blur 1.0 ^
-  --smooth-iters 2 ^
-  --baseline-mode auto ^
-  --align-mode visual ^
-  --keep-components 4 ^
-  --min-component-area 3 ^
-  --component-center-bias 0.65 ^
-  --cell-bleed 0.4 ^
-  --cell-bleed-max 10 ^
-  --core-overlap-min 0.35 ^
-  --charset "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789!?.,;:-""&" ^
-  --no-auto-invert
+
+Replace `--input` with your own atlas path. In PowerShell, the backtick must be
+at the end of the line with no trailing spaces. For Command Prompt (`cmd.exe`),
+put the command on one line or replace each continuation backtick with `^`.
+
+The explicit quality settings above match the pipeline defaults. For a shorter
+command, they can be omitted:
+
+```powershell
+python flux_pipeline.py --input "Example/V3/Example_3_Output_Cyrillic.png" --output-dir "output/cyrillic" --no-upscale --use-grid --language cyrillic
+```
+
+`--align-mode geometric` gives consistent geometric side bearings.
+`--align-mode visual` is an optional alternative that shifts glyphs by foreground
+centroid within the available side bearings. `--debug-dir` writes per-glyph bounds
+and advance widths to `metrics.json` for grid conversion; omit it if not needed.
+The non-grid converter retains its existing behavior.
+
+To retain the atlas's original letter heights and positions, replace
+`--metrics-mode normalized` with `--metrics-mode legacy --baseline-mode auto`.
+This retains the previous alignment strategy while keeping the extraction fixes.
+
+No automatic kerning or TrueType hinting is added; small-size rendering and
+individual letter pairs may still benefit from a font editor.
+
+For a rendered comparison of two existing fonts and regression checks:
+
+```powershell
+python scripts/preview_font.py --before "old.ttf" --after "new.ttf" --language cyrillic --output "output/comparison.png"
+python -m unittest discover -s tests -v
 ```
 
 ## Recommended Workflow (Step-by-step)

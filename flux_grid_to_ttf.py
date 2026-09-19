@@ -1,19 +1,20 @@
 import argparse
 import math
+import json
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageFilter
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
+from scipy.ndimage import distance_transform_edt
+from glyph_metrics import normalize_metrics
+from scripts.atlas_to_ttf import PRESET_CHARSETS
 
 try:
     from skimage import measure
 except ImportError:
     raise SystemExit("Please install scikit-image: pip install scikit-image")
-
-
-CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"
 
 
 def detect_background_is_white(img: Image.Image, border: int = 4) -> bool:
@@ -93,25 +94,30 @@ def contours_from_image(
     trace_blur: float,
     smooth_iters: int,
     invert: bool,
+    edge_blur: float = 0.45,
 ) -> tuple[list[np.ndarray], tuple[float, float, float, float] | None]:
     
     # Подготовка
     work = img.convert("L")
+    # Work in source pixels, so smoothing does not vanish at high trace scales.
+    # A background border also closes contours touching an extraction boundary.
+    pad = 3
+    padded = Image.new("L", (work.width + 2 * pad, work.height + 2 * pad), 255 if invert else 0)
+    padded.paste(work, (pad, pad))
+    work = padded
+    if edge_blur > 0:
+        work = work.filter(ImageFilter.GaussianBlur(radius=edge_blur))
     
     # Upscale для более плавного контура
     if trace_scale > 1:
-        work = work.resize((img.width * trace_scale, img.height * trace_scale), resample=Image.Resampling.LANCZOS)
+        work = work.resize((work.width * trace_scale, work.height * trace_scale), resample=Image.Resampling.LANCZOS)
     
     if trace_blur > 0:
         work = work.filter(ImageFilter.GaussianBlur(radius=trace_blur))
 
     arr = np.array(work, dtype=np.float32) / 255.0
     
-    # Инверсия (белые буквы на черном или наоборот). 
-    # Предполагаем, что буквы светлее фона, если среднее < 0.5, иначе инвертируем.
-    # Но для надежности лучше считать, что threshold отделяет объект.
-    # Обычно find_contours ищет уровень. Если буквы белые (1.0), level 0.5 работает.
-    # Если буквы черные (0.0), нужно инвертировать.
+    # Normalize foreground to white for contour extraction.
     if invert:
         arr = 1.0 - arr
 
@@ -125,19 +131,19 @@ def contours_from_image(
             continue
         # skimage возвращает (row, col) -> (y, x). Нам нужно (x, y)
         pts = np.stack([contour[:, 1], contour[:, 0]], axis=1)
+        # Simplification tolerance is in source pixels, independent of sampling.
+        pts = (pts + 0.5) / float(trace_scale) - 0.5 - pad
         
         # 1. Сначала упрощаем, чтобы убрать шум пикселей
         if simplify > 0:
             pts = measure.approximate_polygon(pts, tolerance=simplify)
+        if len(pts) > 1 and np.allclose(pts[0], pts[-1]):
+            pts = pts[:-1]
         
-        # 2. Сглаживаем углы (Chaikin), пока координаты еще крупные
+        # Smooth the simplified closed contour without a duplicate endpoint.
         if smooth_iters > 0 and pts.shape[0] > 3:
             pts = chaikin_smooth(pts, iterations=smooth_iters)
 
-        # 3. Возвращаем к оригинальному масштабу
-        if trace_scale > 1:
-            pts = pts / float(trace_scale)
-            
         if pts.shape[0] >= 3:
             simplified.append(pts)
             all_points.append(pts)
@@ -189,6 +195,9 @@ def draw_glyph_fixed_grid(
     if align_mode == "visual" and visual_center_x is not None:
         # Keep advance width from geometric bounds, but center by visual mass.
         x_anchor = float(visual_center_x) - (content_width * 0.5)
+        # Keep optical corrections within the available side bearings.
+        limit = side_bearing / max(scale, 1e-9)
+        x_anchor = float(np.clip(x_anchor, g_min_x - limit, g_min_x + limit))
 
     for contour in contours:
         # contour points are in cell-local coordinates (0..cell_w, 0..cell_h)
@@ -284,11 +293,8 @@ def clean_cell_components(
     diag = max(1.0, math.hypot(cx, cy))
 
     candidates_core: list[tuple[float, int]] = []
-    candidates_other: list[tuple[float, int]] = []
-    fallback: list[tuple[int, int]] = []
     for region in measure.regionprops(labels):
         area = int(region.area)
-        fallback.append((area, int(region.label)))
         if area < int(min_component_area):
             continue
         label_id = int(region.label)
@@ -301,20 +307,20 @@ def clean_cell_components(
         score = float(area) * (1.0 - float(center_bias) * dist_norm)
         if intersects_core:
             candidates_core.append((score, label_id))
-        else:
-            candidates_other.append((score, label_id))
 
     if candidates_core:
         candidates_core.sort(key=lambda x: x[0], reverse=True)
         keep_labels = {label for _, label in candidates_core[: max(1, int(keep_components))]}
-    elif candidates_other:
-        candidates_other.sort(key=lambda x: x[0], reverse=True)
-        keep_labels = {label for _, label in candidates_other[: max(1, int(keep_components))]}
     else:
-        fallback.sort(key=lambda x: x[0], reverse=True)
-        keep_labels = {fallback[0][1]} if fallback else set()
+        # Do not resurrect rejected noise or steal a neighbor for an empty cell.
+        keep_labels = set()
 
     cleaned = np.isin(labels, list(keep_labels))
+    # Retain the grayscale fringe belonging to a kept component. Thresholding
+    # it away creates a staircase before the contour tracer even starts.
+    distance, nearest = distance_transform_edt(labels == 0, return_indices=True)
+    nearest_labels = labels[tuple(nearest)]
+    cleaned |= (labels == 0) & (distance <= 2.0) & np.isin(nearest_labels, list(keep_labels))
     out = np.full_like(arr, bg_val, dtype=np.uint8)
     out[cleaned] = arr[cleaned]
     return Image.fromarray(out, mode="L")
@@ -362,7 +368,11 @@ def main() -> None:
     parser.add_argument("--image", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--font-name", default="FluxFont")
-    parser.add_argument("--charset", default=CHARSET)
+    parser.add_argument("--language", choices=PRESET_CHARSETS, default="latin")
+    parser.add_argument("--charset", default=None)
+    parser.add_argument("--metrics-mode", choices=["normalized", "legacy"], default="normalized",
+                        help="Normalize letter heights and baselines, or retain atlas placement.")
+    parser.add_argument("--debug-dir", default=None)
     parser.add_argument("--canvas", type=int, default=2048)
 
     # Grid override
@@ -445,7 +455,8 @@ def main() -> None:
     # Vectorization
     parser.add_argument("--threshold", type=int, default=127)
     parser.add_argument("--contour-level", type=float, default=0.5)
-    parser.add_argument("--simplify", type=float, default=1.0)
+    parser.add_argument("--simplify", type=float, default=0.25, help="Contour tolerance in source pixels.")
+    parser.add_argument("--edge-blur", type=float, default=0.45, help="Edge smoothing radius in source pixels.")
     parser.add_argument("--trace-scale", type=int, default=4)
     parser.add_argument("--trace-blur", type=float, default=1.0)
     parser.add_argument("--smooth-iters", type=int, default=2)
@@ -457,6 +468,22 @@ def main() -> None:
     parser.add_argument("--fixed-metrics", action="store_true")
 
     args = parser.parse_args()
+    if args.charset is None:
+        args.charset = PRESET_CHARSETS[args.language]
+    if not args.charset or len(set(args.charset)) != len(args.charset):
+        parser.error("charset must be nonempty and contain no duplicate characters")
+    if (args.cols is None) != (args.rows is None):
+        parser.error("--cols and --rows must be specified together")
+    if args.cols is not None and (min(args.cols, args.rows) < 1 or args.cols * args.rows < len(args.charset)):
+        parser.error("grid must have positive dimensions and fit the charset")
+    if args.upm < 16 or args.upm > 16384 or args.side_bearing < 0:
+        parser.error("upm must be in [16, 16384] and side-bearing must be nonnegative")
+    if args.trace_scale < 1 or min(args.edge_blur, args.trace_blur, args.simplify, args.smooth_iters) < 0:
+        parser.error("trace-scale must be >= 1; smoothing parameters must be nonnegative")
+    if not 0 < args.contour_level < 1 or not 0 <= args.threshold <= 255:
+        parser.error("contour-level must be in (0, 1); threshold must be in [0, 255]")
+    if not 0 <= args.baseline_quantile <= 1:
+        parser.error("baseline-quantile must be in [0, 1]")
 
     if not (0 < args.baseline_ratio < 1):
         raise SystemExit("baseline-ratio must be between 0 and 1")
@@ -500,6 +527,8 @@ def main() -> None:
         cell_h = cell_size_sq
 
     print(f"Grid: {cols}x{rows}, Cell: {cell_w}x{cell_h}")
+    if min(cell_w, cell_h) < 1:
+        parser.error("image is too small for the requested grid")
 
     row_baselines: dict[int, float] = {}
     baseline_ratio_used = args.baseline_ratio
@@ -560,6 +589,7 @@ def main() -> None:
             trace_blur=args.trace_blur,
             smooth_iters=args.smooth_iters,
             invert=contour_invert,
+            edge_blur=args.edge_blur,
         )
         visual_center_x = None
         visual_centroid = visual_centroid_from_cell(cell_img, contour_invert, args.threshold)
@@ -593,12 +623,23 @@ def main() -> None:
         glyph_entries.append(
             {
                 "char": ch,
+                "row": row,
                 "contours": contours,
                 "baseline_px": baseline_px,
                 "y_shift_px": y_shift_px,
                 "visual_center_x": visual_center_x,
             }
         )
+
+    cap_height = x_height = None
+    if args.metrics_mode == "normalized":
+        cap_height, x_height = normalize_metrics(glyph_entries)
+        max_above = max_below = 0.0
+        for entry in glyph_entries:
+            bounds = contours_bounds(entry["contours"])
+            if bounds is not None:
+                max_above = max(max_above, -bounds[1])
+                max_below = max(max_below, bounds[3])
 
     fallback_scale = args.upm / float(cell_h) * (1.0 - args.padding)
     padding_units = int(args.upm * args.padding)
@@ -648,8 +689,8 @@ def main() -> None:
 
     pen = TTGlyphPen(None)
     pen.moveTo((50, 0))
-    pen.lineTo((50, args.upm))
-    pen.lineTo((450, args.upm))
+    pen.lineTo((50, ascent - padding_units))
+    pen.lineTo((450, ascent - padding_units))
     pen.lineTo((450, 0))
     pen.closePath()
     glyph_dict[".notdef"] = pen.glyph()
@@ -675,7 +716,8 @@ def main() -> None:
         )
 
         glyph_dict[ch] = pen.glyph()
-        metrics[ch] = (advance, args.side_bearing)
+        glyph_dict[ch].recalcBounds(None)
+        metrics[ch] = (advance, getattr(glyph_dict[ch], "xMin", 0))
 
     if not has_space:
         space_pen = TTGlyphPen(None)
@@ -691,15 +733,32 @@ def main() -> None:
     fb.setupHorizontalMetrics(metrics)
     fb.setupHorizontalHeader(ascent=ascent, descent=descent)
     fb.setupOS2(
+        version=4,
         sTypoAscender=ascent,
         sTypoDescender=descent,
         usWinAscent=ascent,
         usWinDescent=abs(descent),
+        sTypoLineGap=0,
+        fsSelection=0xC0,  # Regular + USE_TYPO_METRICS, consistent line layout.
+        sCapHeight=round(cap_height * scale) if cap_height else 0,
+        sxHeight=round(x_height * scale) if x_height else 0,
     )
 
     out_path = output_dir / f"{out_file_stem}.ttf"
     fb.save(out_path)
     print(f"Saved: {out_path}")
+    if args.debug_dir:
+        debug_dir = Path(args.debug_dir)
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        report = {"font": font_name, "ascent": ascent, "descent": descent, "glyphs": {}}
+        for ch in args.charset:
+            glyph = glyph_dict[ch]
+            report["glyphs"][ch] = {
+                "advance": metrics[ch][0], "lsb": metrics[ch][1],
+                "bounds": [getattr(glyph, name, 0) for name in ("xMin", "yMin", "xMax", "yMax")],
+                "contours": glyph.numberOfContours,
+            }
+        (debug_dir / "metrics.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":

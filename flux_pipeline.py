@@ -8,9 +8,7 @@ from tqdm import tqdm
 
 import numpy as np
 from PIL import Image
-
-
-CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,;:-"
+from scripts.atlas_to_ttf import PRESET_CHARSETS
 
 
 def sanitize_name(value: str) -> str:
@@ -71,6 +69,7 @@ def build_atlas_cmd(
         str(args.align_mode),
     ]
     if use_grid:
+        cmd.extend(["--metrics-mode", args.metrics_mode, "--edge-blur", str(args.edge_blur)])
         cmd.extend(["--canvas", str(args.canvas)])
         if args.cols:
             cmd.extend(["--cols", str(args.cols)])
@@ -115,7 +114,7 @@ def build_atlas_cmd(
                 str(args.downsample),
             ]
         )
-    if debug_dir is not None and not use_grid:
+    if debug_dir is not None:
         cmd.extend(["--debug-dir", str(debug_dir)])
     return cmd
 
@@ -136,7 +135,10 @@ def main() -> None:
     parser.add_argument("--pad-mode", default="reflect")
     parser.add_argument("--format", choices=["png", "webp"], default="png")
 
-    parser.add_argument("--charset", default=CHARSET)
+    parser.add_argument("--language", choices=PRESET_CHARSETS, default="latin")
+    parser.add_argument("--charset", default=None)
+    parser.add_argument("--metrics-mode", choices=["normalized", "legacy"], default="normalized")
+    parser.add_argument("--edge-blur", type=float, default=0.45)
     parser.add_argument("--threshold", type=int, default=127)
     
     # Grid override options
@@ -204,7 +206,7 @@ def main() -> None:
     )
 
     parser.add_argument("--vectorize", choices=["rects", "contours"], default="contours")
-    parser.add_argument("--simplify", type=float, default=0.8)
+    parser.add_argument("--simplify", type=float, default=0.25, help="Contour tolerance in source pixels.")
     parser.add_argument("--fixed-metrics", action="store_true")
     parser.add_argument("--baseline-ratio", type=float, default=0.75, help="Baseline position (0=top, 1=bottom)")
     parser.add_argument("--baseline-mode", choices=["fixed", "auto"], default="fixed", help="Baseline mode for grid alignment.")
@@ -235,6 +237,8 @@ def main() -> None:
     parser.add_argument("--no-auto-invert", action="store_true", help="Disable auto inversion (grid).")
 
     args = parser.parse_args()
+    if args.charset is None:
+        args.charset = PRESET_CHARSETS[args.language]
     if args.glyph_post_scale is not None and args.glyph_post_scale <= 0:
         raise SystemExit("glyph-post-scale must be > 0")
     if args.keep_components < 1:
