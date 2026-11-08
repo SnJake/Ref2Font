@@ -518,14 +518,14 @@ def main():
             safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', f"{entry['style_key']}_{font_path.stem}")
             sample_file = args.output_dir / f"{safe_name}.json"
             
-            with open(sample_file, 'w') as f:
+            with open(sample_file, 'w', encoding="utf-8") as f:
                 json.dump({
                     "font_path": str(font_path),
                     "glyphs": processed_glyphs
                 }, f)
             data_samples.append(str(sample_file))
 
-    with open(args.output_dir / "manifest.json", 'w') as f:
+    with open(args.output_dir / "manifest.json", 'w', encoding="utf-8") as f:
         json.dump(data_samples, f)
 
 if __name__ == "__main__":
